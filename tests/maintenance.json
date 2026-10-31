@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "owner": "zmk-feature-device-info",
+  "supported_cores": [
+    "dya"
+  ],
+  "unsupported_core_status": "NOT APPLICABLE",
+  "commands": [
+    "python3 tests/protocol/run.py",
+    "python3 -m unittest discover -v -s tests -p test_owner.py",
+    "bash tests/run-web.sh"
+  ],
+  "coverage_map": "tests/README.md",
+  "web_lifecycle_fixture": "tests/web/lifecycle.spec.tsx: eight provider cases for connection/index manual refresh, loading, unmount and preserved automatic-load cancellation; all original seven scenarios retained.",
+  "preserved_assertions": "Relocated fixtures retain their prior assertions; no snapshot auto-accept or unique assertion removal.",
+  "execution": {
+    "quick": "All behavioral scenarios once; sanitizer variants where supported.",
+    "full": "Same scenarios plus relevant optimization, ABI, role, kernel and supported-core checks.",
+    "outputs": "Use a fresh evidence directory; existing evidence is never overwritten."
+  },
+  "gaps": [
+    "Physical USB/BLE/split delivery, timing, power and retention require matching production-board evidence.",
+    "The build-id note parser runs in host tests on crafted notes; POSIX has no linker note, so the board checks in tests/test_owner.py cover its presence, the boundary symbols and the UF2 bytes flashed at that range. Reading it at runtime on hardware is not exercised. Actual HWINFO drivers are controlled in host tests."
+  ],
+  "native_verification": "tests/native_verifier.py: actual exit, registered test completion, raw ordered logs, unchanged snapshots, identical binary repeated three times.",
+  "regression_fixtures": [
+    {
+      "fixture": "tests/protocol/harness.c",
+      "contract": "BLE host profile count for standalone, central with one or two peers, peripheral and USB-only; assert decoded nanopb response and controlled core API boundary."
+    }
+  ],
+  "web_assertions": {
+    "location": "tests/web/",
+    "preserved_tests": 7,
+    "previous_location": "web/test/",
+    "configuration": "tests/web/jest.config.ts; generated real schema; unchanged two suites and assertions; module paths select web/node_modules",
+    "commands": [
+      "bash tests/run-web.sh",
+      "cd web && npm run lint",
+      "cd web && npm run build"
+    ],
+    "limits": "Controlled Studio helpers; no physical Serial/BLE/HWINFO acceptance."
+  }
+}

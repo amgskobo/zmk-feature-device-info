@@ -1,5 +1,13 @@
 # ZMK Feature: Device Info
 
+## Reviewed fork
+
+This fork's reviewed source is on `codex/device-info-review` in
+[`amgskobo/zmk-feature-device-info`](https://github.com/amgskobo/zmk-feature-device-info/tree/codex/device-info-review).
+Select that repository URL and revision in the module's west project entry.
+Keep the module's documented imports enabled where required. The original
+upstream installation examples below describe the upstream repository.
+
 ![ZMK Version](https://img.shields.io/badge/ZMK-master-blue)
 [![Test](https://github.com/cormoran/zmk-feature-device-info/actions/workflows/zmk-module.yml/badge.svg?branch=main)](https://github.com/cormoran/zmk-feature-device-info/actions/workflows/zmk-module.yml)
 
@@ -9,10 +17,10 @@ A ZMK module that exposes keyboard diagnostic information via the **unofficial**
 
 | Section | Contents |
 |---------|----------|
-| **Build** | ZMK git hash, zmk-config git hash, this module's git hash, Zephyr version, build timestamp, board name, and a **build hash**. Each version shows a "dirty" warning if the source had uncommitted changes at build time. |
-| **Hardware** | MCU hardware unique ID, last reset cause (Power-On / Watchdog / Brownout / etc.), flash and SRAM size. |
+| **Build** | ZMK git hash, zmk-config git hash, this module's git hash, Zephyr version, build timestamp, board name, and a **build hash**. Each version shows a "dirty" warning if the source had uncommitted changes at build time (a `git describe --dirty` string ending in `-dirty`). |
+| **Hardware** | MCU hardware unique ID, reset cause read at boot (Power-On / Watchdog / Brownout / etc.; the hardware bits accumulate until a module such as zmk-feature-watchdog clears them), flash and SRAM size. |
 | **ZMK Configuration** | KScan driver type, BLE/USB/split/display/RGB/backlight flags. |
-| **Runtime** | Uptime since last boot. |
+| **Runtime** | Uptime in milliseconds, encoded as uint32; it wraps after about 49.7 days. |
 | **Zephyr Devices** | All statically-declared Zephyr devices and whether each initialized successfully. Failing devices are shown first. |
 
 A **Copy JSON** button lets users paste the full diagnostic data into a bug report.
@@ -62,9 +70,11 @@ Or run locally: see [web/README.md](./web/README.md).
 
 ## Notes
 
-- **zmk-config version**: The module automatically reads the git hash of your zmk-config directory at build time (via the `ZMK_CONFIG` CMake variable set by `west build`). No extra setup is needed.
+- **zmk-config version**: The module automatically reads the git hash of your zmk-config directory at build time (via the `ZMK_CONFIG` CMake variable set by `west build`). No extra setup is needed. It is empty when that directory is not in a git checkout; the module version reads `unknown` in the same case.
+- **When versions are read**: The version strings and build timestamp are read when CMake configures the build. An incremental `west build` that does not reconfigure keeps the earlier values; use a pristine build (`west build -p`) for release images. The build-id below comes from the linked artifact.
 - **Hardware unique ID / reset cause**: Requires `CONFIG_HWINFO=y` (enabled automatically when supported by the board).
-- **Build hash**: A [GNU build-id](https://interrupt.memfault.com/blog/gnu-build-id-for-firmware) — a SHA1 of the linked firmware image — is embedded in flash and reported here. It uniquely identifies the exact binary a device is running, so you can match a keyboard back to the matching ELF for crash/error analysis. Find the same value in a build artifact with:
+- **BLE profile count**: Reports `ZMK_BLE_PROFILE_COUNT`, the selectable host profiles. Bond capacity reserved for split peers is excluded.
+- **Build hash**: A GNU build-id is embedded in flash and reported here to help select the corresponding ELF for crash/error analysis. It is a linker-generated identifier, not a checksum of the complete ELF file. Keep and verify the artifact's full SHA-256 separately. Find its build-id with:
 
   ```bash
   readelf -n build/zephyr/zmk.elf   # look for the "Build ID" line
@@ -74,12 +84,13 @@ Or run locally: see [web/README.md](./web/README.md).
 
 ## Development
 
-See [README in zmk-module-template](https://github.com/cormoran/zmk-module-template) for the full development guide including how to run tests.
+See [the owner test guide](tests/README.md) for current commands, dependency
+pins and verification limits, and [the Web guide](web/README.md) for the client.
 
 ```bash
 # Run unit test + build test
-python3 -m unittest
+python3 -m unittest discover -v -s tests -p test_owner.py
 
 # Run web tests
-cd web && npm test
+bash tests/run-web.sh
 ```
