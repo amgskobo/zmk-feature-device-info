@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { connect as serial_connect } from "@zmkfirmware/zmk-studio-ts-client/transport/serial";
 import {
@@ -70,13 +70,29 @@ function App() {
 
 export function DeviceInfoPanel() {
   const zmkApp = useContext(ZMKAppContext);
-  const [info, setInfo] = useState<DeviceInfoResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<{
+    connection: unknown;
+    subsystemIndex: number | undefined;
+    info: DeviceInfoResponse | null;
+    isLoading: boolean;
+    error: string | null;
+  }>({
+    connection: null,
+    subsystemIndex: undefined,
+    info: null,
+    isLoading: false,
+    error: null,
+  });
+  const generation = useRef(0);
 
   const subsystem = zmkApp?.findSubsystem(SUBSYSTEM_IDENTIFIER);
   const connection = zmkApp?.state.connection;
   const subsystemIndex = subsystem?.index;
+  const current =
+    view.connection === connection && view.subsystemIndex === subsystemIndex;
+  const info = current ? view.info : null;
+  const isLoading = current && view.isLoading;
+  const error = current ? view.error : null;
 
   const fetchDeviceInfo = useCallback(
     async (connection: RpcConnection, subsystemIndex: number) => {
@@ -94,42 +110,44 @@ export function DeviceInfoPanel() {
     []
   );
 
-  // Auto-fetch when subsystem becomes available.
-  useEffect(() => {
+  const fetchInfo = useCallback(async () => {
     if (!connection || subsystemIndex === undefined || subsystemIndex < 0)
       return;
-    let cancelled = false;
-    const loadInfo = async () => {
-      try {
-        const nextInfo = await fetchDeviceInfo(connection, subsystemIndex);
-        if (cancelled) return;
-        setError(null);
-        setInfo(nextInfo);
-      } catch (e) {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Unknown error");
-      }
-    };
-    void loadInfo();
-    return () => {
-      cancelled = true;
-    };
-  }, [connection, fetchDeviceInfo, subsystemIndex]);
-
-  const fetchInfo = async () => {
-    if (!connection || subsystemIndex === undefined || subsystemIndex < 0)
-      return;
-    setIsLoading(true);
-    setError(null);
+    const token = ++generation.current;
+    const active = () => token === generation.current;
+    setView((previous) => ({
+      connection,
+      subsystemIndex,
+      info:
+        previous.connection === connection &&
+        previous.subsystemIndex === subsystemIndex
+          ? previous.info
+          : null,
+      isLoading: true,
+      error: null,
+    }));
     try {
       const nextInfo = await fetchDeviceInfo(connection, subsystemIndex);
-      setInfo(nextInfo);
+      if (active()) setView((previous) => ({ ...previous, info: nextInfo }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      if (active())
+        setView((previous) => ({
+          ...previous,
+          error: e instanceof Error ? e.message : "Unknown error",
+        }));
     } finally {
-      setIsLoading(false);
+      if (active()) setView((previous) => ({ ...previous, isLoading: false }));
     }
-  };
+  }, [connection, fetchDeviceInfo, subsystemIndex]);
+
+  // Both automatic and manual requests retire on source change or unmount.
+  useEffect(() => {
+    const timer = window.setTimeout(() => void fetchInfo(), 0);
+    return () => {
+      window.clearTimeout(timer);
+      ++generation.current;
+    };
+  }, [fetchInfo]);
 
   if (!zmkApp) return null;
 

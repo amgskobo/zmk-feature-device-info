@@ -3,7 +3,7 @@ import {
   createConnectedMockZMKApp,
   ZMKAppProvider,
 } from "@cormoran/zmk-studio-react-hook/testing";
-import { DeviceInfoPanel, SUBSYSTEM_IDENTIFIER } from "../src/App";
+import { DeviceInfoPanel, SUBSYSTEM_IDENTIFIER } from "../../web/src/App";
 
 describe("DeviceInfoPanel Component", () => {
   describe("Without ZMKAppContext", () => {
@@ -24,11 +24,11 @@ describe("DeviceInfoPanel Component", () => {
       render(
         <ZMKAppProvider value={mockZMKApp}>
           <DeviceInfoPanel />
-        </ZMKAppProvider>
+        </ZMKAppProvider>,
       );
 
       expect(
-        screen.getByText(/not found/i, { selector: "p" })
+        screen.getByText(/not found/i, { selector: "p" }),
       ).toHaveTextContent(SUBSYSTEM_IDENTIFIER);
     });
   });
@@ -44,7 +44,7 @@ describe("DeviceInfoPanel Component", () => {
         render(
           <ZMKAppProvider value={mockZMKApp}>
             <DeviceInfoPanel />
-          </ZMKAppProvider>
+          </ZMKAppProvider>,
         );
       });
 

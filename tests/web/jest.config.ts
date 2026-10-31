@@ -1,9 +1,12 @@
 import type { Config } from "jest";
 
 const config: Config = {
+  rootDir: "../../web",
+  roots: ["<rootDir>/../tests/web"],
+  modulePaths: ["<rootDir>/node_modules"],
   preset: "ts-jest",
   testEnvironment: "jsdom",
-  setupFilesAfterEnv: ["<rootDir>/test/setup.ts"],
+  setupFilesAfterEnv: ["<rootDir>/../tests/web/setup.ts"],
   moduleNameMapper: {
     // Map the base paths first
     "^@zmkfirmware/zmk-studio-ts-client$":
@@ -35,7 +38,7 @@ const config: Config = {
       },
     ],
   },
-  testMatch: ["**/test/**/*.spec.ts", "**/test/**/*.spec.tsx"],
+  testMatch: ["**/tests/web/**/*.spec.ts", "**/tests/web/**/*.spec.tsx"],
 };
 
 export default config;

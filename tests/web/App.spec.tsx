@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupZMKMocks } from "@cormoran/zmk-studio-react-hook/testing";
-import App from "../src/App";
+import App from "../../web/src/App";
 
 jest.mock("@zmkfirmware/zmk-studio-ts-client", () => ({
   create_rpc_connection: jest.fn(),
@@ -18,7 +18,7 @@ describe("App Component", () => {
       render(<App />);
 
       expect(
-        screen.getByRole("heading", { level: 1, name: /ZMK Device Info/i })
+        screen.getByRole("heading", { level: 1, name: /ZMK Device Info/i }),
       ).toBeInTheDocument();
     });
 
@@ -32,7 +32,7 @@ describe("App Component", () => {
       render(<App />);
 
       expect(screen.getByRole("contentinfo")).toHaveTextContent(
-        /ZMK Device Info/i
+        /ZMK Device Info/i,
       );
     });
   });
@@ -64,7 +64,7 @@ describe("App Component", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Connected to: Test Keyboard/i)
+          screen.getByText(/Connected to: Test Keyboard/i),
         ).toBeInTheDocument();
       });
 
