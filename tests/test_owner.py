@@ -1,5 +1,7 @@
 import platform
-import shutil
+import os
+import struct
+import tempfile
 import subprocess
 import unittest
 from pathlib import Path
@@ -9,7 +11,12 @@ from dataclasses import dataclass
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import NoteSection
 
-THIS_DIR = Path(__file__).parent.resolve()
+from native_verifier import verify_native
+from test_native_verifier import NativeVerifierContract as NativeVerifierContract
+
+from test_build_budget import BuildBudgetContract as BuildBudgetContract
+
+THIS_DIR = Path(__file__).resolve().parent.parent
 
 
 def read_build_id(elf_path: Path) -> str | None:
@@ -25,7 +32,39 @@ def read_build_id(elf_path: Path) -> str | None:
     return None
 
 
+def read_build_id_range(elf_path: Path) -> tuple[int, int, int, bytes]:
+    """Return the reader's boundary symbols, the note's address and its bytes."""
+    with open(elf_path, "rb") as f:
+        elf = ELFFile(f)
+        section = elf.get_section_by_name(".note.gnu.build-id")
+        symbols = elf.get_section_by_name(".symtab")
+        start, end = (
+            symbols.get_symbol_by_name(name)[0]["st_value"]
+            for name in ("__build_id_note_start", "__build_id_note_end")
+        )
+        return start, end, section["sh_addr"], section.data()
+
+
+def read_uf2(uf2_path: Path, address: int, size: int) -> bytes | None:
+    """Return the bytes a UF2 image flashes at [address, address + size), or
+    None when the image does not cover all of them."""
+    data = uf2_path.read_bytes()
+    image = {}
+    for block in range(0, len(data), 512):
+        target, length = struct.unpack_from("<II", data, block + 12)
+        payload = data[block + 32 : block + 32 + length]
+        image.update(zip(range(target, target + length), payload))
+    if not all(at in image for at in range(address, address + size)):
+        return None
+    return bytes(image[at] for at in range(address, address + size))
+
+
 def run_west(args: list[str]) -> subprocess.CompletedProcess[str]:
+    if args and args[0] == "zmk-build":
+        parallelism = int(os.environ.get("OWNER_TEST_BUILD_PARALLELISM", "1"))
+        if parallelism < 1:
+            raise ValueError("OWNER_TEST_BUILD_PARALLELISM must be a positive integer")
+        args = [args[0], "--parallelism", str(parallelism), *args[1:]]
     return subprocess.run(
         ["west", *args],
         capture_output=True,
@@ -54,23 +93,43 @@ class WestCommandsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.WEST_TOPDIR = Path(run_west(["topdir"]).stdout.strip())
-        cls.BUILD_DIR = cls.WEST_TOPDIR / "build"
+        requested_output = os.environ.get("OWNER_TEST_OUTPUT")
+        if requested_output:
+            cls.BUILD_DIR = Path(requested_output).resolve()
+            cls.BUILD_DIR.mkdir(parents=True, exist_ok=False)
+        else:
+            cls.BUILD_DIR = Path(tempfile.mkdtemp(prefix=THIS_DIR.name + "-tests-"))
+        print(f"Owner test output: {cls.BUILD_DIR}", flush=True)
 
     @unittest.skipUnless(
         platform.system() == "Linux", "zmk-test is only supported on Linux"
     )
     def test_zmk_test(self):
         test_build_dir = self.BUILD_DIR / THIS_DIR.name
-        shutil.rmtree(test_build_dir, ignore_errors=True)
 
         result = run_west(["zmk-test", "tests", "-m", ".", "-d", str(test_build_dir)])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        verify_native(test_build_dir, THIS_DIR / "tests")
         self.assertIn("PASS: test", result.stdout, result.stdout + result.stderr)
         self.assertIn("PASS: studio", result.stdout, result.stdout + result.stderr)
         self.assertIn(
             "PASS: studio_unsecured", result.stdout, result.stdout + result.stderr
         )
         self.assertNotIn("FAILED: ", result.stdout, result.stdout + result.stderr)
+
+    @unittest.skipUnless(platform.system() == "Linux", "host build requires Linux")
+    def test_protocol(self):
+        result = subprocess.run(
+            ["python3", str(THIS_DIR / "tests" / "protocol" / "run.py")],
+            env={**os.environ, "ZMK_TEST_MODE": "full"},
+            capture_output=True,
+            text=True,
+            cwd=THIS_DIR,
+        )
+        (self.BUILD_DIR / "test_protocol.log").write_text(
+            result.stdout + result.stderr, encoding="utf-8"
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_zmk_build(self):
         self._test_zmk_build(
@@ -119,6 +178,16 @@ class WestCommandsTests(unittest.TestCase):
         self.assertEqual(
             len(rpc_build_id), 40, f"expected SHA1 build-id, got: {rpc_build_id}"
         )
+        # The runtime reader takes the note from the boundary symbols, so they
+        # must bracket exactly that section, and the flashed image must hold
+        # the note at that address.
+        start, end, address, note = read_build_id_range(rpc_elf)
+        self.assertEqual((start, end), (address, address + len(note)))
+        self.assertEqual(
+            read_uf2(rpc_elf.with_name("zmk.uf2"), start, end - start),
+            note,
+            "build-id note is not in the flashed image",
+        )
 
         no_rpc_elf = self.BUILD_DIR / "board_without_rpc" / "zephyr" / "zmk.elf"
         self.assertTrue(no_rpc_elf.exists(), f"{no_rpc_elf} is missing")
@@ -131,10 +200,17 @@ class WestCommandsTests(unittest.TestCase):
         self, artifacts_and_expected_build_params: dict[str, ConfigAndDeviceTree]
     ):
 
-        for artifact in artifacts_and_expected_build_params.keys():
-            shutil.rmtree(self.BUILD_DIR / artifact, ignore_errors=True)
-
-        result = run_west(["zmk-build", "tests/zmk-config", "-q"])
+        result = run_west(
+            [
+                "zmk-build",
+                "tests/zmk-config",
+                "-q",
+                "-P",
+                "1",
+                "-d",
+                str(self.BUILD_DIR),
+            ]
+        )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
         for artifact, entries in artifacts_and_expected_build_params.items():

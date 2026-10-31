@@ -1,0 +1,70 @@
+{
+  "source": "src/studio/device_info_handler.c",
+  "cases": [
+    {
+      "name": "missing build presence",
+      "old": "result.has_build = true;",
+      "new": "result.has_build = false;"
+    },
+    {
+      "name": "wrong split role",
+      "old": "COPY_FIELD(result.zmk_config.split_role, \"none\");",
+      "new": "COPY_FIELD(result.zmk_config.split_role, \"central\");"
+    },
+    {
+      "name": "incorrect uptime wrap",
+      "old": "result.runtime.uptime_ms = (uint32_t)k_uptime_get();",
+      "new": "result.runtime.uptime_ms = (uint32_t)k_uptime_get() + 1;"
+    },
+    {
+      "name": "device readiness lost",
+      "old": "dev.ready = device_is_ready(&devices[i]);",
+      "new": "dev.ready = false;"
+    },
+    {
+      "name": "dirty found inside a tag",
+      "old": "    return len >= sizeof(suffix) - 1 && strcmp(version + len - (sizeof(suffix) - 1), suffix) == 0;",
+      "new": "    return strstr(version, \"dirty\") != NULL || len < sizeof(suffix) - 1;"
+    },
+    {
+      "name": "dirty read from the truncated copy",
+      "old": "    result.build.zmk_dirty = version_is_dirty(ZMK_BUILD_VERSION);",
+      "new": "    result.build.zmk_dirty = version_is_dirty(result.build.zmk_version);"
+    },
+    {
+      "name": "reset cause read at request time",
+      "old": "        result.hardware.reset_cause = boot_reset_cause;",
+      "new": "        hwinfo_get_reset_cause(&result.hardware.reset_cause);"
+    },
+    {
+      "name": "build-id name padding dropped",
+      "old": "    uint64_t name_bytes = ((uint64_t)header.namesz + 3) & ~(uint64_t)3;",
+      "new": "    uint64_t name_bytes = header.namesz;"
+    },
+    {
+      "name": "build-id name size wraps in 32 bits",
+      "old": "    uint64_t name_bytes = ((uint64_t)header.namesz + 3) & ~(uint64_t)3;",
+      "new": "    uint64_t name_bytes = (header.namesz + 3u) & ~3u;"
+    },
+    {
+      "name": "build-id descriptor bound dropped",
+      "old": "name_bytes + header.descsz > len - sizeof(header)",
+      "new": "name_bytes > len - sizeof(header)"
+    },
+    {
+      "name": "build-id note type ignored",
+      "old": "header.type != NT_GNU_BUILD_ID || ",
+      "new": ""
+    },
+    {
+      "name": "battery flag read from the BLE option",
+      "old": "IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)",
+      "new": "IS_ENABLED(CONFIG_ZMK_BLE)"
+    },
+    {
+      "name": "display and underglow flags swapped",
+      "old": "    result.zmk_config.display_enabled = IS_ENABLED(CONFIG_ZMK_DISPLAY);",
+      "new": "    result.zmk_config.display_enabled = IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW);"
+    }
+  ]
+}

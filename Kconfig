@@ -20,3 +20,8 @@ config ZMK_DEVICE_INFO_STUDIO_RPC_REQUIRE_UNLOCK
       hardware details to any Studio-capable host that can reach the keyboard.
 
 endif
+
+config ZMK_FEATURE_DEVICE_INFO_LOG_LEVEL
+    int "zmk-feature-device-info log level (0 off, 1 error, 2 warning, 3 info, 4 debug)"
+    range 0 4
+    default 3
