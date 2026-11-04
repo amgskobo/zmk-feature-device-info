@@ -61,7 +61,14 @@ source is patched. This complements registration/native and board checks. The pr
 uses distinct standalone, one-peer central, two-peer central, peripheral and
 USB-only cases: the public field reports selectable host profiles, excluding
 bond slots reserved by a BLE split central. The host fixture controls the core
-profile-count API; real-header compatibility remains part of owner board builds.
+profile-count API. Two additional header-backed roles read the selected core's
+public profile-count macro block from `ZMK_ROOT/app/include/zmk/ble.h` (or the
+resolved west project), record its SHA-256 and compile it with the complete
+production handler/codec. The standalone uses five paired slots; the central
+uses six slots with one reserved split peer. Both must decode five host
+profiles. Prepare `ZMK_ROOT` explicitly when running outside a west workspace;
+the test does not fetch or change the core. Full header/build compatibility
+remains in the firmware matrix.
 A long-versions role checks the dirty flags against the full build strings: a
 dirty version longer than its 80-byte field stays dirty although the reported
 copy is cut, and a tag that merely contains "dirty" is clean. The build-id
@@ -70,6 +77,50 @@ cut descriptor, a wrong note type, a name size that would wrap a 32-bit bound
 and an id longer than its field. POSIX has no linker note; the board build checks
 that the boundary symbols bracket the note and that the UF2 image flashes those
 exact bytes there. The runner is also `test_owner.WestCommandsTests.test_protocol`.
+
+The retained `tests/review/test_profile_count.py` is a legacy executable that
+expects an obsolete two-argument/int-return handler signature. It is unsupported
+against the current handler and is not counted as passing or as a canonical
+entry. Its unique assertions are mapped into the current full-source protocol
+fixture; the original file remains available for evidence review:
+
+| Legacy assertion | Current executable owner assertion |
+|---|---|
+| Handler successfully returns device info | `device_info_rpc_handle_request` success and the decoded response discriminator in `tests/protocol/harness.c`. |
+| Build/hardware/config/runtime presence | `test_requests_and_wire`, plus `test_selected_core_profiles` decoded `has_*` assertions. |
+| Selected core computes five standalone profiles | `header-standalone` reads the selected public macro definitions with five paired slots, then decodes count 5. |
+| A central with six slots/one peer still has five host profiles | `header-central` uses the same selected definitions and explicitly checks `ZMK_BLE_PROFILE_COUNT == 5` and decoded count 5. |
+| Exact synthetic uptime 12345 survives the codec | `test_selected_core_profiles` sets 12345 and requires decoded 12345; the existing uint32-wrap-to-9 assertion is retained separately. |
+| ASan/UBSan execution | Both added header roles use the existing sanitizer mode, and full mode retains optimized variants as well. |
+
+`tests/readiness/run.py --output NEW_OUTPUT` adds a real Zephyr deferred device
+and invokes the actual core/custom handler and complete response codec. It
+initializes that device after the enclosing sizing pass, then requires successful
+encoding and decoded device count/order/truncated names/ready values before,
+during and after initialization, with unchanged total lengths. The original
+Studio key trace is retained, with a checked completion and three identical
+binary runs. The canonical owner entry includes this case. The nanopb readiness
+field has explicit presence and is set even for `false`; public protobuf fields
+and TypeScript semantics are unchanged. It is an output-time observation, not
+an atomic snapshot of all device states or a physical driver acceptance test.
+
+For the isolated DI-1 control, run `python3 tests/review_negative_control.py
+"$ISOLATED_OWNER"` from the unchanged owner. It restores both the proto3 scalar
+omission and the matching handler assignment, avoiding an artificial compile
+failure. Then run the unchanged readiness fixture:
+
+```sh
+python3 tests/readiness/run.py --output "$EVIDENCE/readiness-negative" \
+  --module-root "$ISOLATED_OWNER" --expect-encoding-failure
+```
+
+This explicit control mode preserves all positive assertions and builds once.
+Even if west's initial execution fails, it executes the resulting identical
+binary three times in separate empty directories and requires the specific
+`deferred-init-during-output encoded=0` observation and its encoding assertion
+each time. Compile/setup failures or unrelated crashes do not establish the
+control. The default positive owner entry still requires successful core/custom
+decoding, unchanged Studio traces and its existing three-repeat verifier.
 
 ## Reproducible isolated checks
 

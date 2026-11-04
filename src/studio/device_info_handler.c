@@ -146,6 +146,7 @@ static bool encode_zephyr_devices(pb_ostream_t *stream, const pb_field_t *field,
         }
         zmk_device_info_ZephyrDevice dev = zmk_device_info_ZephyrDevice_init_zero;
         COPY_FIELD(dev.name, devices[i].name);
+        dev.has_ready = true;
         dev.ready = device_is_ready(&devices[i]);
         if (!pb_encode_tag_for_field(stream, field)) {
             return false;

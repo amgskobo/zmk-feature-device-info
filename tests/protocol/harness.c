@@ -10,6 +10,31 @@
 #include OWNER_HANDLER_SOURCE
 
 static unsigned decoded_count;
+
+#ifdef FIXTURE_USE_SELECTED_CORE_PROFILES
+/* Migrated unique assertions from the retained legacy extraction fixture:
+ * selected core arithmetic, full handler/codec, presence and exact uptime. */
+static void test_selected_core_profiles(void) {
+    const uint8_t valid[] = {0x0a, 0x00};
+    zmk_custom_CallRequest request = {0};
+    memcpy(request.payload.bytes, valid, sizeof(valid));
+    request.payload.size = sizeof(valid);
+    pb_callback_t callback = {0};
+    uptime = 12345;
+    assert(device_info_rpc_handle_request(&request, &callback));
+    uint8_t bytes[2048];
+    pb_ostream_t output = pb_ostream_from_buffer(bytes, sizeof(bytes));
+    assert(pb_encode(&output, zmk_device_info_Response_fields, &response_zmk__device_info));
+    zmk_device_info_Response decoded = zmk_device_info_Response_init_zero;
+    pb_istream_t input = pb_istream_from_buffer(bytes, output.bytes_written);
+    assert(pb_decode(&input, zmk_device_info_Response_fields, &decoded));
+    const zmk_device_info_DeviceInfoResponse *info = &decoded.response_type.device_info;
+    assert(info->has_build && info->has_hardware && info->has_zmk_config && info->has_runtime);
+    assert(ZMK_BLE_PROFILE_COUNT == 5 && info->zmk_config.ble_profile_count == 5);
+    assert(info->runtime.uptime_ms == 12345);
+    puts("device-info selected core profile header: PASS presence, count=5, uptime=12345");
+}
+#endif
 static bool decode_device(pb_istream_t *stream, const pb_field_t *field, void **arg) {
     (void)field;
     (void)arg;
@@ -173,5 +198,8 @@ static void test_build_id(void) {
 int main(void) {
     test_requests_and_wire();
     test_build_id();
+#ifdef FIXTURE_USE_SELECTED_CORE_PROFILES
+    test_selected_core_profiles();
+#endif
     return 0;
 }

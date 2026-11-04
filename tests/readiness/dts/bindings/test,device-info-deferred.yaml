@@ -1,0 +1,3 @@
+description: Synthetic deferred device for the Device Info codec fixture
+compatible: "test,device-info-deferred"
+include: base.yaml

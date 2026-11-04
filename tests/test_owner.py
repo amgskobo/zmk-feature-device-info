@@ -131,6 +131,26 @@ class WestCommandsTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    @unittest.skipUnless(
+        platform.system() == "Linux", "native readiness requires Linux"
+    )
+    def test_readiness_encoding(self):
+        result = subprocess.run(
+            [
+                "python3",
+                "tests/readiness/run.py",
+                "--output",
+                str(self.BUILD_DIR / "readiness"),
+            ],
+            cwd=THIS_DIR,
+            capture_output=True,
+            text=True,
+        )
+        (self.BUILD_DIR / "test_readiness.log").write_text(
+            result.stdout + result.stderr
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_zmk_build(self):
         self._test_zmk_build(
             {

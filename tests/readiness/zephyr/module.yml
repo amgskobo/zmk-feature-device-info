@@ -1,0 +1,5 @@
+name: device-info-readiness-test
+build:
+  cmake: .
+  settings:
+    dts_root: .

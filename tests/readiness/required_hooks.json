@@ -1,0 +1,7 @@
+[
+  {
+    "hook": "device_info_readiness",
+    "configs": ["CONFIG_ZMK_STUDIO", "CONFIG_ZMK_DEVICE_INFO", "CONFIG_ZMK_DEVICE_INFO_STUDIO_RPC"],
+    "fixtures": ["studio_readiness"]
+  }
+]

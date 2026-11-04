@@ -1,0 +1,6 @@
+/ {
+    codec_deferred: codec-deferred {
+        compatible = "test,device-info-deferred";
+        zephyr,deferred-init;
+    };
+};

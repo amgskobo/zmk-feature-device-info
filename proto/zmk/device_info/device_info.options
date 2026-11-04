@@ -14,6 +14,9 @@ zmk.device_info.HardwareInfo.device_id        max_size:34
 
 # repeated ZephyrDevice uses pb_callback_t (no max_count = callback encoding)
 zmk.device_info.ZephyrDevice.name             max_size:32
+# Always emit readiness, including false, so deferred initialization cannot
+# change message lengths between nanopb's nested sizing and output passes.
+zmk.device_info.ZephyrDevice.ready            proto3:false
 
 zmk.device_info.ZmkConfig.kscan_compatible    max_size:64
 zmk.device_info.ZmkConfig.split_role          max_size:16

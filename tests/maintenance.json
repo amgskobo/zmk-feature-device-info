@@ -23,7 +23,13 @@
     "The build-id note parser runs in host tests on crafted notes; POSIX has no linker note, so the board checks in tests/test_owner.py cover its presence, the boundary symbols and the UF2 bytes flashed at that range. Reading it at runtime on hardware is not exercised. Actual HWINFO drivers are controlled in host tests."
   ],
   "native_verification": "tests/native_verifier.py: actual exit, registered test completion, raw ordered logs, unchanged snapshots, identical binary repeated three times.",
+  "readiness_negative_control": "tests/review_negative_control.py restores both proto3 omission and handler presence assignment in an isolated source; tests/readiness/run.py --expect-encoding-failure requires the specific readiness encoding assertion three times from one binary, not a build failure.",
+  "legacy_profile_fixture": "tests/review/test_profile_count.py is retained but unsupported with the current handler signature and is not counted as passing. Its success/presence/exact uptime=12345 and selected-core standalone=5 / central(6 slots,1 peer)=5 assertions are mapped in tests/README.md and migrated to protocol header-backed roles; original controlled role matrix remains.",
   "regression_fixtures": [
+    {
+      "fixture": "tests/readiness/readiness_test.c and run.py",
+      "contract": "Actual deferred device_init during nested nanopb sizing/output; complete core/custom envelope decodes with stable lengths, exact device order/names/readiness, checked completion and unchanged Studio trace; three identical binary runs. Original handler/options fail encoding."
+    },
     {
       "fixture": "tests/protocol/harness.c",
       "contract": "BLE host profile count for standalone, central with one or two peers, peripheral and USB-only; assert decoded nanopb response and controlled core API boundary."

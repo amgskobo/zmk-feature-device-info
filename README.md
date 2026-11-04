@@ -25,6 +25,10 @@ A ZMK module that exposes keyboard diagnostic information via the **unofficial**
 
 A **Copy JSON** button lets users paste the full diagnostic data into a bug report.
 
+Device readiness is observed as each entry is encoded. Its boolean is always
+present on the wire, including `false`, so a deferred device initialization
+during response encoding cannot change the enclosing message lengths.
+
 ## Module User Guide
 
 ### 1. Add to `config/west.yml`

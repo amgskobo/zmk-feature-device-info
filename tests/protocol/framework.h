@@ -32,9 +32,15 @@
 #define CONFIG_BOARD "test-board"
 #define CONFIG_FLASH_SIZE 1024
 #define CONFIG_SRAM_SIZE 256
+#ifndef CONFIG_BT_MAX_PAIRED
 #define CONFIG_BT_MAX_PAIRED 5
+#endif
 /* Controlled core API values include peer slots reserved by split centrals. */
+#ifdef FIXTURE_USE_SELECTED_CORE_PROFILES
+#include "selected_ble_profile_counts.h"
+#else
 #define ZMK_BLE_PROFILE_COUNT FIXTURE_BLE_PROFILE_COUNT
+#endif
 struct device {
     const char *name;
     bool ready;

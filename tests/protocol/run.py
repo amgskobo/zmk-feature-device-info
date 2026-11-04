@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import argparse
+import hashlib
 import os
 import re
 import shutil
@@ -15,6 +16,19 @@ parser.add_argument(
     "--source", type=Path, default=root / "src/studio/device_info_handler.c"
 )
 args = parser.parse_args()
+zmk = Path(
+    os.environ.get("ZMK_ROOT")
+    or subprocess.check_output(
+        ["west", "list", "zmk", "-f", "{abspath}"], text=True
+    ).strip()
+)
+ble_header = zmk / "app/include/zmk/ble.h"
+ble_source = ble_header.read_text()
+profile_definitions = ble_source[
+    ble_source.index("#define ZMK_BLE_IS_CENTRAL") : ble_source.index(
+        "void zmk_ble_clear_bonds"
+    )
+]
 nanopb = Path(
     os.environ.get("NANOPB_SOURCE")
     or subprocess.check_output(
@@ -29,6 +43,12 @@ with tempfile.TemporaryDirectory(prefix="device-info-protocol-") as folder:
     include = work / "include"
     generated = work / "generated"
     generated.mkdir()
+    (generated / "selected_ble_profile_counts.h").write_text(profile_definitions)
+    print(
+        "Selected zmk/ble.h sha256="
+        + hashlib.sha256(ble_header.read_bytes()).hexdigest(),
+        flush=True,
+    )
     for name in re.findall(r"#include <([^>]+)>", args.source.read_text()):
         if name.startswith("pb_") or name.endswith(".pb.h"):
             continue
@@ -70,6 +90,8 @@ with tempfile.TemporaryDirectory(prefix="device-info-protocol-") as folder:
         ("peripheral", 1, 0, 0, 1, 1, 5, 0, 1),
         ("usb-only", 0, 0, 1, 1, 0, 0, 0, 0),
         ("long-versions", 0, 0, 1, 1, 1, 5, 0, 1),
+        ("header-standalone", 0, 0, 1, 1, 1, 5, 0, 1),
+        ("header-central", 1, 1, 1, 1, 1, 5, 1, 1),
     ]:
         defines = dict(
             ARCH_POSIX=1,
@@ -86,6 +108,12 @@ with tempfile.TemporaryDirectory(prefix="device-info-protocol-") as folder:
             ZMK_BATTERY_REPORTING=battery,
             ZMK_DEVICE_INFO_STUDIO_RPC_REQUIRE_UNLOCK=secured,
         )
+        header_options = []
+        if role.startswith("header-"):
+            header_options = [
+                "-DFIXTURE_USE_SELECTED_CORE_PROFILES=1",
+                "-DCONFIG_BT_MAX_PAIRED=" + str(5 + peer_slots),
+            ]
         for mode, options in [
             (
                 "sanitized",
@@ -107,6 +135,7 @@ with tempfile.TemporaryDirectory(prefix="device-info-protocol-") as folder:
                 "cc",
                 "-std=c11",
                 "-DFIXTURE_BLE_PROFILE_COUNT=" + str(profiles),
+                *header_options,
                 *versions.get(role, []),
                 "-Wall",
                 "-Wextra",
