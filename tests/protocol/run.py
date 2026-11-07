@@ -3,17 +3,25 @@
 
 from pathlib import Path
 import argparse
+from contextlib import nullcontext
 import hashlib
+import json
 import os
 import re
 import shutil
 import subprocess
 import tempfile
+import time
 
 root = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument(
     "--source", type=Path, default=root / "src/studio/device_info_handler.c"
+)
+parser.add_argument(
+    "--output",
+    type=Path,
+    help="Fresh directory retaining generated inputs, binaries and raw runs",
 )
 args = parser.parse_args()
 zmk = Path(
@@ -38,7 +46,39 @@ nanopb = Path(
 test_mode = os.environ.get("ZMK_TEST_MODE", "quick")
 if test_mode not in ("quick", "full"):
     raise SystemExit("ZMK_TEST_MODE must be quick or full")
-with tempfile.TemporaryDirectory(prefix="device-info-protocol-") as folder:
+if args.output:
+    args.output = args.output.parent.resolve() / args.output.name
+    if os.path.lexists(args.output):
+        raise FileExistsError(args.output)
+    args.output.mkdir(parents=True, exist_ok=False)
+    workspace = nullcontext(str(args.output))
+else:
+    workspace = tempfile.TemporaryDirectory(prefix="device-info-protocol-")
+
+
+def run_recorded(command, name, work):
+    start = time.time_ns()
+    result = subprocess.run(
+        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    )
+    (work / (name + ".log")).write_text(result.stdout)
+    (work / (name + ".json")).write_text(
+        json.dumps(
+            dict(
+                command=command,
+                start_ns=start,
+                end_ns=time.time_ns(),
+                exit=result.returncode,
+            ),
+            indent=2,
+        )
+        + "\n"
+    )
+    print(result.stdout, end="", flush=True)
+    result.check_returncode()
+
+
+with workspace as folder:
     work = Path(folder)
     include = work / "include"
     generated = work / "generated"
@@ -56,7 +96,7 @@ with tempfile.TemporaryDirectory(prefix="device-info-protocol-") as folder:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('#include "framework.h"\n')
     shutil.copytree(nanopb / "generator", work / "generator")
-    subprocess.run(
+    run_recorded(
         [
             "python3",
             str(work / "generator/nanopb_generator.py"),
@@ -66,7 +106,36 @@ with tempfile.TemporaryDirectory(prefix="device-info-protocol-") as folder:
             str(generated),
             str(root / "proto/zmk/device_info/device_info.proto"),
         ],
-        check=True,
+        "generate",
+        work,
+    )
+    (work / "inputs.json").write_text(
+        json.dumps(
+            {
+                str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in [
+                    args.source.resolve(),
+                    root / "tests/protocol/harness.c",
+                    root / "tests/protocol/framework.h",
+                    ble_header,
+                    *sorted((root / "proto").rglob("*.*")),
+                    *(
+                        nanopb / name
+                        for name in (
+                            "pb_common.c",
+                            "pb_encode.c",
+                            "pb_decode.c",
+                            "pb.h",
+                            "pb_common.h",
+                            "pb_encode.h",
+                            "pb_decode.h",
+                        )
+                    ),
+                ]
+            },
+            indent=2,
+        )
+        + "\n"
     )
     # Version strings: a dirty build longer than its 80-byte field (the
     # "-dirty" suffix is cut from the reported copy), a tag that merely
@@ -162,7 +231,10 @@ with tempfile.TemporaryDirectory(prefix="device-info-protocol-") as folder:
                 "-o",
                 str(binary),
             ]
-            subprocess.run(command, check=True)
+            run_recorded(command, role + "-" + mode + "-compile", work)
             print("COMPILED", role, mode, flush=True)
-            subprocess.run([str(binary)], check=True)
+            (work / (binary.name + ".sha256")).write_text(
+                hashlib.sha256(binary.read_bytes()).hexdigest() + "\n"
+            )
+            run_recorded([str(binary)], role + "-" + mode + "-run", work)
             print(role, mode, "PASS", flush=True)

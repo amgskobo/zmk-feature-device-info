@@ -51,6 +51,12 @@ owner matrix. No network updates are implicit in the owner test command.
 python3 tests/protocol/run.py
 ```
 
+Add `--output NEW_DIRECTORY` to retain generated schema/include inputs, every
+compile/run command with its actual exit and ordered output, and the binaries
+with SHA-256 hashes. An existing path is rejected. The canonical owner entry and
+protocol negative-control runner select fresh retained directories automatically;
+omitting this option preserves the standalone temporary-workspace behavior.
+
 This compiles the complete production handler with the owner-generated schema
 and real nanopb under sanitizers and optimization. Set `NANOPB_SOURCE` to the
 explicitly inspected nanopb checkout (physical-layout also needs `ZEPHYR_BASE`).
@@ -144,6 +150,14 @@ prepare Web dependencies with the normal package lifecycle first where present.
 A successful hook exit must also leave source inputs unchanged. Snapshot and
 event-pattern bytes are excluded from whitespace rewriting.
 
+`tests/web/sdk-privacy.spec.ts` parses the shipped SDK codec methods selected by
+the application's and React hook's package lookup paths. Both request encoding
+and response decoding must be present and contain no console reference. Named
+request/response logging controls use in-memory copies and require that exact
+rejection; installed dependencies are not patched. The check covers those codec
+methods, not arbitrary data flow or the SDK's connection/stream error logging.
+The original seven UI cases and eight lifecycle cases remain unchanged.
+
 ## Canonical Web test location
 
 The existing seven UI tests and their setup/Jest configuration live in
@@ -175,8 +189,35 @@ reject missing configuration when both the request and build omit it; excluded
 roles cannot replace the requested role. The verifier retains all three raw
 runs before comparing unchanged ordered snapshots and rejects logged failures,
 fatal output and missing/nonzero completions. `tests/test_native_verifier.py`
-owns eleven real-ELF admission controls, including a deliberately missing
+owns fourteen real-ELF admission controls, including a deliberately missing
 native scenario, wrong-role and unrelated-fixture controls.
+
+Recoverable ASan/UBSan diagnostics now reject a run even when the actual process
+exits zero, its checked-init result is zero and its key snapshot matches. Two
+real instrumented ELF controls establish the runtime diagnostic and zero exit
+independently before requiring this exact rejection. Both fail against the
+original verifier because it accepted all three faulty runs. A positive control
+retains ordinary sanitizer option names and application markers without treating
+them as runtime diagnostics. `OWNER_NATIVE_CONTROL_OUTPUT=NEW_DIRECTORY` retains
+the control programs, fixtures, independent runtime output and raw verifier runs;
+each test's destination must be new.
+
+To revalidate an unchanged retained binary without rebuilding it:
+
+```sh
+python3 tests/native_verifier.py --retained-build RETAINED_BUILD \
+  --new-output NEW_OUTPUT --fixtures MATCHING_OWNER_FIXTURES
+```
+
+Keep binary/config/fixture hashes and source identities with that revalidation.
+At the selected DYA core, the combined native ASan/UBSan fixtures emit a signed
+`1 << 31` diagnostic from `app/module/drivers/kscan/kscan_mock.c:103`. With its
+recovering sanitizer configuration the process can still exit zero and the
+readiness checked-init can complete; those observations do not establish a
+sanitizer-clean run. The corrected verifier rejects the diagnostic. This combined
+clean gate remains BLOCKED by the selected core; ASan-only, optimized and host
+protocol results have their own scope. No core patch or fixture deletion is used
+to hide it.
 
 `bash tests/run-web.sh` is the canonical schema-generation/Web test entry.
 It runs all configured Jest scenarios in one worker process. The pre-commit

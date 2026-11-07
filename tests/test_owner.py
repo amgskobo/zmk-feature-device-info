@@ -120,7 +120,12 @@ class WestCommandsTests(unittest.TestCase):
     @unittest.skipUnless(platform.system() == "Linux", "host build requires Linux")
     def test_protocol(self):
         result = subprocess.run(
-            ["python3", str(THIS_DIR / "tests" / "protocol" / "run.py")],
+            [
+                "python3",
+                str(THIS_DIR / "tests" / "protocol" / "run.py"),
+                "--output",
+                str(self.BUILD_DIR / "protocol"),
+            ],
             env={**os.environ, "ZMK_TEST_MODE": "full"},
             capture_output=True,
             text=True,

@@ -38,6 +38,8 @@ def main():
             str(ROOT / "tests/protocol/run.py"),
             "--source",
             str(source),
+            "--output",
+            str(folder / "build"),
         ]
         with (folder / "run.log").open("wb") as log:
             result = subprocess.run(

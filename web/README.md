@@ -46,9 +46,15 @@ npm run test:watch
 npm run test:coverage
 ```
 
-The two existing UI suites retain seven tests for rendering, Serial connection,
-missing context/subsystem and the diagnostic panel. They use controlled Studio
-helpers. The separate firmware protocol suite validates real generated nanopb
+The original seven UI scenarios and eight provider lifecycle scenarios cover
+rendering, Serial connection, missing context/subsystem, connection/index changes
+and retired refresh results. They use controlled Studio helpers. SDK privacy
+checks parse the actual shipped request/response codec methods resolved from
+both the application and React hook, including a nested SDK when installed;
+named request/response logging controls must fail the specific console-reference
+check. Connection/stream error logging remains outside that codec check. This is
+a source boundary check, not a general data-flow or browser-console guarantee.
+The separate firmware protocol suite validates real generated nanopb
 responses; neither suite establishes physical USB/BLE, HWINFO driver behavior,
 reset-cause accuracy or device uptime on a board. See the
 [owner test guide](../tests/README.md) for commands and dependency pins.
@@ -59,5 +65,20 @@ Building local output does not publish the application.
 
 `package.json` overrides the Studio client's transitive `protobufjs` dependency
 to `7.6.5`, including the patched UTF-8 helper. Use `npm ci` with this lockfile.
-After changing dependencies, run `npm audit --omit=dev`, the Web tests and the
-production build.
+Preparation must complete the installed packages' normal lifecycle scripts; if
+npm reports pending script approvals, inspect those scripts and explicitly
+prepare them before the network-free test/build run. Do not count an incomplete
+install as successful preparation.
+
+The 2026-11-07 lock review updated only advisory-affected compatible transitive
+packages and their required dependency closure. For example, Handlebars 4.7.10
+fixes the [reported AST injection issue](https://github.com/handlebars-lang/handlebars.js/security/advisories/GHSA-8r5x-fm3f-whwj).
+Direct requirements, both resolved Studio Git commits, the Vite alias and
+`protobufjs` override remain unchanged. The installed-graph audit reports zero
+production vulnerabilities with `npm audit --omit=dev`; the full audit still
+reports 18 development findings (14 moderate and four low). `deepmerge`, `glob`
+and `minimatch` remain constrained by incoming development dependencies; the
+suggested major substitutions/Jest downgrade were not applied. This is an
+explicit remaining full-audit failure, not a claim that all dependencies are
+secure. Recheck both audit scopes after dependency changes, then run the Web
+tests, production build and lint with the reviewed lockfile.

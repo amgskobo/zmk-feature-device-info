@@ -134,6 +134,19 @@ def verify_native(output: Path, tests: Path):
                 raise AssertionError(
                     f"{case}: native exit {result.returncode}; see {run}"
                 )
+            # Recoverable sanitizer faults can leave a successful process exit,
+            # checked-init marker and key snapshot. Admit none of those as a
+            # clean run when the runtime emitted a diagnostic. Match diagnostic
+            # formats, rather than ordinary option names or application markers.
+            if re.search(
+                r"^(?:(?:==\d+==)?(?:ERROR|WARNING|SUMMARY): "
+                r"(?:Address|Leak|Memory|Thread|UndefinedBehavior)Sanitizer:"
+                r"|(?:Address|UndefinedBehavior)Sanitizer:DEADLYSIGNAL"
+                r"|[^\n]+:\d+(?::\d+)?: runtime error:)",
+                raw,
+                re.M,
+            ):
+                raise AssertionError(f"{case}: sanitizer diagnostic; see {run}")
             if re.search(r"\bFAIL:", raw):
                 raise AssertionError(f"{case}: failed owner assertion; see {run}")
             for hook in hooks:
@@ -183,6 +196,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--retained-build", required=True, type=Path)
     parser.add_argument("--new-output", required=True, type=Path)
+    parser.add_argument(
+        "--fixtures",
+        type=Path,
+        default=Path(__file__).resolve().parent,
+        help="Explicit owner fixture tree matching the retained native cases",
+    )
     args = parser.parse_args()
     # Preserve old failures; reuse bytes only in a fresh independently logged copy.
     shutil.copytree(
@@ -199,4 +218,4 @@ if __name__ == "__main__":
     (args.new_output / "retained-binary-hashes.json").write_text(
         json.dumps(hashes, indent=2)
     )
-    verify_native(args.new_output.resolve(), Path(__file__).resolve().parent)
+    verify_native(args.new_output.resolve(), args.fixtures.resolve(strict=True))
