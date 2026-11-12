@@ -43,6 +43,11 @@ The selected DYA core serializes handler/response use and owns the transport and
 Studio lock lifecycle. The configured unlock check occurs at dispatch; this
 read-only handler does not add a second session or persistence owner.
 
+The handler fills DYA's cleared, persistent response buffer directly. Success
+and error replies avoid temporary full-message copies on the RPC thread stack;
+the persistent buffer remains necessary because encoding follows the handler's
+return. Field capacities, device enumeration and response lifetime are unchanged.
+
 ## Module User Guide
 
 ### 1. Add to `config/west.yml`

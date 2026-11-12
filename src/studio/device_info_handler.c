@@ -122,10 +122,9 @@ static void copy_field(char *dst, size_t size, const char *src) {
 #define COPY_FIELD(dst, src) copy_field(dst, sizeof(dst), src)
 
 static void set_error(zmk_device_info_Response *resp, const char *message) {
-    zmk_device_info_ErrorResponse err = zmk_device_info_ErrorResponse_init_zero;
-    snprintf(err.message, sizeof(err.message), "%s", message);
     resp->which_response_type = zmk_device_info_Response_error_tag;
-    resp->response_type.error = err;
+    snprintf(resp->response_type.error.message, sizeof(resp->response_type.error.message), "%s",
+             message);
 }
 
 /* `git describe --dirty` marks a modified tree with a trailing "-dirty". Read
@@ -159,97 +158,98 @@ static bool encode_zephyr_devices(pb_ostream_t *stream, const pb_field_t *field,
 }
 
 static void handle_get_device_info(zmk_device_info_Response *resp) {
-    zmk_device_info_DeviceInfoResponse result = zmk_device_info_DeviceInfoResponse_init_zero;
+    /* DYA clears this persistent response at allocation. Populate it in place;
+     * deferred encoding still uses that buffer after this handler returns. */
+    zmk_device_info_DeviceInfoResponse *result = &resp->response_type.device_info;
 
     /* Build info */
-    result.has_build = true;
-    COPY_FIELD(result.build.zmk_version, ZMK_BUILD_VERSION);
-    result.build.zmk_dirty = version_is_dirty(ZMK_BUILD_VERSION);
+    result->has_build = true;
+    COPY_FIELD(result->build.zmk_version, ZMK_BUILD_VERSION);
+    result->build.zmk_dirty = version_is_dirty(ZMK_BUILD_VERSION);
 
-    COPY_FIELD(result.build.zmk_config_version, ZMK_CONFIG_BUILD_VERSION);
-    result.build.zmk_config_dirty = version_is_dirty(ZMK_CONFIG_BUILD_VERSION);
+    COPY_FIELD(result->build.zmk_config_version, ZMK_CONFIG_BUILD_VERSION);
+    result->build.zmk_config_dirty = version_is_dirty(ZMK_CONFIG_BUILD_VERSION);
 
-    COPY_FIELD(result.build.module_version, MODULE_BUILD_VERSION);
-    result.build.module_dirty = version_is_dirty(MODULE_BUILD_VERSION);
+    COPY_FIELD(result->build.module_version, MODULE_BUILD_VERSION);
+    result->build.module_dirty = version_is_dirty(MODULE_BUILD_VERSION);
 
-    COPY_FIELD(result.build.zephyr_version, KERNEL_VERSION_STRING);
+    COPY_FIELD(result->build.zephyr_version, KERNEL_VERSION_STRING);
 
-    COPY_FIELD(result.build.build_timestamp, BUILD_TIMESTAMP);
+    COPY_FIELD(result->build.build_timestamp, BUILD_TIMESTAMP);
 
-    COPY_FIELD(result.build.board, CONFIG_BOARD);
+    COPY_FIELD(result->build.board, CONFIG_BOARD);
 
-    fill_build_hash(result.build.build_hash, sizeof(result.build.build_hash));
+    fill_build_hash(result->build.build_hash, sizeof(result->build.build_hash));
 
     /* Hardware info */
-    result.has_hardware = true;
+    result->has_hardware = true;
 #if IS_ENABLED(CONFIG_HWINFO)
     {
         uint8_t dev_id[16];
         ssize_t id_len = hwinfo_get_device_id(dev_id, sizeof(dev_id));
         if (id_len > 0) {
-            for (int i = 0; i < id_len && (i * 2 + 2) < (int)sizeof(result.hardware.device_id);
+            for (int i = 0; i < id_len && (i * 2 + 2) < (int)sizeof(result->hardware.device_id);
                  i++) {
-                snprintf(result.hardware.device_id + i * 2, 3, "%02x", dev_id[i]);
+                snprintf(result->hardware.device_id + i * 2, 3, "%02x", dev_id[i]);
             }
         }
-        result.hardware.reset_cause = boot_reset_cause;
+        result->hardware.reset_cause = boot_reset_cause;
     }
 #endif
 
 #ifdef CONFIG_FLASH_SIZE
-    result.hardware.flash_size_kb = CONFIG_FLASH_SIZE;
+    result->hardware.flash_size_kb = CONFIG_FLASH_SIZE;
 #endif
 #ifdef CONFIG_SRAM_SIZE
-    result.hardware.sram_size_kb = CONFIG_SRAM_SIZE;
+    result->hardware.sram_size_kb = CONFIG_SRAM_SIZE;
 #endif
 
     /* Zephyr device list via callback */
-    result.zephyr_devices.funcs.encode = encode_zephyr_devices;
+    result->zephyr_devices.funcs.encode = encode_zephyr_devices;
 
     /* ZMK config (compile-time Kconfig/DT values) */
-    result.has_zmk_config = true;
+    result->has_zmk_config = true;
 #if DT_HAS_CHOSEN(zmk_kscan)
     /* DT_PROP_BY_IDX for compatible is unreliable; check known types explicitly */
 #if DT_NODE_HAS_COMPAT(DT_CHOSEN(zmk_kscan), zmk_kscan_gpio_matrix)
-    COPY_FIELD(result.zmk_config.kscan_compatible, "zmk,kscan-gpio-matrix");
+    COPY_FIELD(result->zmk_config.kscan_compatible, "zmk,kscan-gpio-matrix");
 #elif DT_NODE_HAS_COMPAT(DT_CHOSEN(zmk_kscan), zmk_kscan_gpio_direct)
-    COPY_FIELD(result.zmk_config.kscan_compatible, "zmk,kscan-gpio-direct");
+    COPY_FIELD(result->zmk_config.kscan_compatible, "zmk,kscan-gpio-direct");
 #elif DT_NODE_HAS_COMPAT(DT_CHOSEN(zmk_kscan), zmk_kscan_gpio_demux)
-    COPY_FIELD(result.zmk_config.kscan_compatible, "zmk,kscan-gpio-demux");
+    COPY_FIELD(result->zmk_config.kscan_compatible, "zmk,kscan-gpio-demux");
 #elif DT_NODE_HAS_COMPAT(DT_CHOSEN(zmk_kscan), zmk_kscan_composite)
-    COPY_FIELD(result.zmk_config.kscan_compatible, "zmk,kscan-composite");
+    COPY_FIELD(result->zmk_config.kscan_compatible, "zmk,kscan-composite");
 #elif DT_NODE_HAS_COMPAT(DT_CHOSEN(zmk_kscan), zmk_kscan_mock)
-    COPY_FIELD(result.zmk_config.kscan_compatible, "zmk,kscan-mock");
+    COPY_FIELD(result->zmk_config.kscan_compatible, "zmk,kscan-mock");
 #endif
 #endif
 
-    result.zmk_config.ble_enabled = IS_ENABLED(CONFIG_ZMK_BLE);
+    result->zmk_config.ble_enabled = IS_ENABLED(CONFIG_ZMK_BLE);
 #if IS_ENABLED(CONFIG_ZMK_BLE)
-    result.zmk_config.ble_profile_count = ZMK_BLE_PROFILE_COUNT;
+    result->zmk_config.ble_profile_count = ZMK_BLE_PROFILE_COUNT;
 #endif
 
-    result.zmk_config.usb_enabled = IS_ENABLED(CONFIG_ZMK_USB);
-    result.zmk_config.split_enabled = IS_ENABLED(CONFIG_ZMK_SPLIT);
+    result->zmk_config.usb_enabled = IS_ENABLED(CONFIG_ZMK_USB);
+    result->zmk_config.split_enabled = IS_ENABLED(CONFIG_ZMK_SPLIT);
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    COPY_FIELD(result.zmk_config.split_role, "central");
+    COPY_FIELD(result->zmk_config.split_role, "central");
 #elif IS_ENABLED(CONFIG_ZMK_SPLIT)
-    COPY_FIELD(result.zmk_config.split_role, "peripheral");
+    COPY_FIELD(result->zmk_config.split_role, "peripheral");
 #else
-    COPY_FIELD(result.zmk_config.split_role, "none");
+    COPY_FIELD(result->zmk_config.split_role, "none");
 #endif
 
-    result.zmk_config.display_enabled = IS_ENABLED(CONFIG_ZMK_DISPLAY);
-    result.zmk_config.rgb_underglow_enabled = IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW);
-    result.zmk_config.backlight_enabled = IS_ENABLED(CONFIG_ZMK_BACKLIGHT);
-    result.zmk_config.battery_level_enabled = IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING);
+    result->zmk_config.display_enabled = IS_ENABLED(CONFIG_ZMK_DISPLAY);
+    result->zmk_config.rgb_underglow_enabled = IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW);
+    result->zmk_config.backlight_enabled = IS_ENABLED(CONFIG_ZMK_BACKLIGHT);
+    result->zmk_config.battery_level_enabled = IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING);
 
     /* Runtime status */
-    result.has_runtime = true;
-    result.runtime.uptime_ms = (uint32_t)k_uptime_get();
+    result->has_runtime = true;
+    result->runtime.uptime_ms = (uint32_t)k_uptime_get();
 
     resp->which_response_type = zmk_device_info_Response_device_info_tag;
-    resp->response_type.device_info = result;
 }
 
 static bool device_info_rpc_handle_request(const zmk_custom_CallRequest *raw_request,

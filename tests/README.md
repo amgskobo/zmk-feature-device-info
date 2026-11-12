@@ -84,6 +84,21 @@ and an id longer than its field. POSIX has no linker note; the board build check
 that the boundary symbols bracket the note and that the UF2 image flashes those
 exact bytes there. The runner is also `test_owner.WestCommandsTests.test_protocol`.
 
+The success and error handlers fill the cleared DYA response buffer in place.
+The existing malformed/unsupported/valid and repeated malformed-to-valid checks
+retain their field-presence, empty hardware-ID, reset-cause and codec oracles;
+all thirteen directed source faults remain in `protocol/negative-cases.json`.
+Only their field-access selectors changed for the response pointer. Matched
+SDK 0.16.9 ARM GCC 12.2.0 builds of the secured `tester_xiao` owner fixture show
+a success-path local frame sum of 656 bytes before the change (32-byte dispatch
+plus 624-byte helper), and a 64-byte dispatch frame after the helper is inlined.
+The error-path sum falls from 112 to 64 bytes. Linked module static RAM remains
+604 bytes, including its 580-byte response buffer. These are compiler-local
+frame and linked allocation observations, excluding core/codec/libc callers;
+they do not measure a complete thread's stack high-water or authorize smaller
+production stacks. All field limits and the output-time readiness behavior stay
+unchanged.
+
 The retained `tests/review/test_profile_count.py` is a legacy executable that
 expects an obsolete two-argument/int-return handler signature. It is unsupported
 against the current handler and is not counted as passing or as a canonical

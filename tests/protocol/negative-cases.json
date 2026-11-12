@@ -3,18 +3,18 @@
   "cases": [
     {
       "name": "missing build presence",
-      "old": "result.has_build = true;",
-      "new": "result.has_build = false;"
+      "old": "result->has_build = true;",
+      "new": "result->has_build = false;"
     },
     {
       "name": "wrong split role",
-      "old": "COPY_FIELD(result.zmk_config.split_role, \"none\");",
-      "new": "COPY_FIELD(result.zmk_config.split_role, \"central\");"
+      "old": "COPY_FIELD(result->zmk_config.split_role, \"none\");",
+      "new": "COPY_FIELD(result->zmk_config.split_role, \"central\");"
     },
     {
       "name": "incorrect uptime wrap",
-      "old": "result.runtime.uptime_ms = (uint32_t)k_uptime_get();",
-      "new": "result.runtime.uptime_ms = (uint32_t)k_uptime_get() + 1;"
+      "old": "result->runtime.uptime_ms = (uint32_t)k_uptime_get();",
+      "new": "result->runtime.uptime_ms = (uint32_t)k_uptime_get() + 1;"
     },
     {
       "name": "device readiness lost",
@@ -28,13 +28,13 @@
     },
     {
       "name": "dirty read from the truncated copy",
-      "old": "    result.build.zmk_dirty = version_is_dirty(ZMK_BUILD_VERSION);",
-      "new": "    result.build.zmk_dirty = version_is_dirty(result.build.zmk_version);"
+      "old": "    result->build.zmk_dirty = version_is_dirty(ZMK_BUILD_VERSION);",
+      "new": "    result->build.zmk_dirty = version_is_dirty(result->build.zmk_version);"
     },
     {
       "name": "reset cause read at request time",
-      "old": "        result.hardware.reset_cause = boot_reset_cause;",
-      "new": "        hwinfo_get_reset_cause(&result.hardware.reset_cause);"
+      "old": "        result->hardware.reset_cause = boot_reset_cause;",
+      "new": "        hwinfo_get_reset_cause(&result->hardware.reset_cause);"
     },
     {
       "name": "build-id name padding dropped",
@@ -63,8 +63,8 @@
     },
     {
       "name": "display and underglow flags swapped",
-      "old": "    result.zmk_config.display_enabled = IS_ENABLED(CONFIG_ZMK_DISPLAY);",
-      "new": "    result.zmk_config.display_enabled = IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW);"
+      "old": "    result->zmk_config.display_enabled = IS_ENABLED(CONFIG_ZMK_DISPLAY);",
+      "new": "    result->zmk_config.display_enabled = IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW);"
     }
   ]
 }
